@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+	<node pkg="xsens_driver" type="mtnode_new.py" name="xsens_driver" output="screen" >
+
+	</node>
+	<node pkg="arduino_mr" type="pioneer_2at.py" name="arduino_mr" output="screen" >
+
+	</node>
+	<node pkg="joy" type="joy_node" name="joy" output="screen" >
+
+	</node>
+	<node pkg="joy_to_arduino" type="teleop_MR_2at" name="joy_to_arduino" output="screen" >
+
+	</node>
+</launch>
