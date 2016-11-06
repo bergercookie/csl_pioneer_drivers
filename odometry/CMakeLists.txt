@@ -29,12 +29,6 @@ include_directories(
 )
 
 add_executable(odometry_node_3dx src/odometry_node3.cpp)
-
 target_link_libraries(odometry_node_3dx ${catkin_LIBRARIES})
 
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
-
 add_dependencies (odometry_node_3dx odometry_generate_messages_cpp)
-
