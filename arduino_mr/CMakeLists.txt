@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   rosserial_arduino
   std_msgs
+  nav_msgs
   geometry_msgs
   joy_to_arduino
   mrpt_msgs
@@ -75,6 +76,7 @@ add_message_files(
 generate_messages(
    DEPENDENCIES
    std_msgs
+   nav_msgs
    geometry_msgs
 )
 
