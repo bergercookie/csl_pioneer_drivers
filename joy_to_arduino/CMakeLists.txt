@@ -29,7 +29,7 @@ add_executable(teleop_MR_2at src/teleop_MR_2at.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(joy_to_arduino_node joy_to_arduino_generate_messages_cpp)
+add_dependencies(teleop_MR_2at arduino_feedback_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(joy_to_arduino_node
