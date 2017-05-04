@@ -2,13 +2,13 @@
 
 """
 Mon Sep 26 12:00:44 EEST 2016, Nikos Koukis
-Send velocity commands to the Arduino controlling a Pioneer 2at robot
+
+Send velocity commands and read odometry feedback from a Pioneer 2AT robot with
+custom drivers (not powered by ARIA)
 
 Initial script written by: Apostolos Poulias, 2015
-Maintainer: Nikos Koukis, 2016:-
+Maintainer: Nikos Koukis, 2016 -
 
-TODO:
-- Read serial port from the command line and have a default if not given
 """
 
 
@@ -37,7 +37,11 @@ class ATX2():
 
         # parameter names
         self.param_names = {}
-        self.param_names["arduino_port"] = "port"
+        self.param_names["port"] = "~port"
+
+        # dictionary of default ROS parameter values
+        self.def_params = {}
+        self.def_params[self.param_names["port"]] = "/dev/ttyACM0"
 
         # frame ID names
         self.frame_IDs = {}
@@ -51,7 +55,7 @@ class ATX2():
         self.rate = 200
 
         # Setup the robot odometry message
-        self.odom = Odometry
+        self.odom = Odometry()
         self.odom.header.frame_id = self.frame_IDs["world"]
         self.odom.child_frame_id = self.frame_IDs["odometry"]
 
@@ -63,8 +67,9 @@ class ATX2():
         # See
         # http://wiki.ros.org/rospy/Overview/Publishers%20and%20Subscribers#Choosing_a_good_queue_size
         # on how to choose queue_size
-        self.arduino_pub = rospy.Publisher('arduino_input_2at', arduino_input,
-                                   queue_size=self.rate)
+        self.arduino_pub = rospy.Publisher('arduino_input_2at',
+                                           arduino_input,
+                                           queue_size=self.rate)
         self.odometry_pub = rospy.Publisher("odom",
                                             Odometry,
                                             queue_size=self.rate)
@@ -87,16 +92,32 @@ class ATX2():
             "Fetching the serial port for communicating with the arduino")
         # Wait until the arduino port parameter is available in the ROS
         # parameter server
-        while not rospy.has_param(self.param_names["arduino_port"]):
+        while not rospy.has_param(self.param_names["port"]) and \
+                num_tries <= tries_thresh and \
+                not rospy.is_shutdown():
             rospy.logwarn(
-                "Arduino port is not set yet. Retrying... {}/{}".format(
-                    num_tries, tries_thresh))
+                "Arduino port is not set yet. Retrying... {}/{}".\
+                format(num_tries,
+                       tries_thresh))
             time.sleep(2)
+            num_tries += 1
 
-        serial_port = rospy.get_param(self.arduino_port_param)
+        if num_tries > tries_thresh:
+            rospy.logwarn(
+                "Arduino port is not set. Defaulting to %s",
+                self.def_params[self.param_names["port"]])
+
+
+        serial_port = rospy.get_param(self.param_names["port"],
+                                      "/dev/ttyACM0")
 
         # Launch the rosserial node
-        node = roslaunch.core.Node(package, executable, args=serial_port)
+        node = roslaunch.core.Node(package,
+                                   executable,
+                                   args=serial_port,
+                                   remap_args=[("/arduino_input_2at",
+                                                "{ns}/arduino_input_2at".\
+                                                format(ns=rospy.get_namespace()))])
         launch = roslaunch.scriptapi.ROSLaunch()
         launch.start()
 
@@ -126,28 +147,36 @@ class ATX2():
         wR = 2.0 * pi * (encoderR / self.encres) / 0.015
         # dtheta = ((encoderR - encoderL) * 2.0 * pi * self.R) / (2.0 * self.encres * self.d)
         omega = -((wR - wL) * self.R) / (self.d * 2.0)
+        # Rotation around Z axis only
+        # TODO
+        # self.odom.pose.pose.orientation += omega / float(self.rate)
+        # self.odom.pose.pose.orientation %= 2 * pi
+
         u = (wR + wL) * self.R / 2.0
-        u_x = u * cos(self.odom.pose.pose.theta)
-        u_y = u * sin(self.odom.pose.pose.theta)
+        # TODO - change this
+        # u_x = u * cos(self.odom.pose.pose.theta)
+        # u_y = u * sin(self.odom.pose.pose.theta)
+        u_x = u * cos(0)
+        u_y = u * sin(0)
 
         #
         # Update the published odometry message
         #
         self.odom.header.stamp = rospy.Time.now()
-        self.header.seq = self.msg_seqs["odometry"]
+        self.odom.header.seq = self.msg_seqs["odometry"]
 
         # Current velocity update
         self.odom.twist.twist.linear = Vector3(x=u, y=0, z=0)
         self.odom.twist.twist.angular = Vector3(x=0, y=0, z=omega)
 
         # Current position update
-        self.odom.pose.pose.x += u_x / float(self.rate)
-        self.odom.pose.pose.y += u_y / float(self.rate)
-        self.odom.pose.pose.theta += omega / self.rate
-        self.odom.pose.pose.theta %= 2 * pi
+        self.odom.pose.pose.position.x += u_x / float(self.rate)
+        self.odom.pose.pose.position.y += u_y / float(self.rate)
 
         # Publish the odometry message
-        rospy.logdebug("Publishing pioneer nav_msgs::Odometry message... {}".format(self.odom))
+        rospy.logdebug(
+            "Publishing pioneer nav_msgs::Odometry message... %s",
+            self.odom)
         self.odometry_pub.publish(self.odom)
 
         self.msg_seqs["odometry"] += 1
