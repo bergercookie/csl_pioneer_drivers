@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<!--
+
+Tue Jun 6 18:22:59 EEST 2017, Nikos Koukis
+
+Current file launches the rosserial_python/serial.py nodes for communicating with the arduino low-level controller and also the python nodes for safely shutting the latter  when pressing ctrl+c
+
+-->
+
+<launch>
+
+    <arg name="communication_port" default="/dev/ttyACM0"/>
+    <arg name="odom_topic" default="odom"/>
+    <arg name="arduino_topic" default="/arduino_input_2at"/>
+    <arg name="robot_model" default="pioneer_2at"/>
+    <arg name="output" default="screen"/>
+
+    <!-- NODES TO BE LAUNCHED -->
+    <remap from="odom" to="$(arg odom_topic)"/>
+    <node pkg="arduino_mr" type="$(arg robot_model).py" name="drivers" output="$(arg output)">
+	    <param name="~port" value="$(arg communication_port)"  />
+    </node>
+
+    <remap from="/arduino_input_2at" to="$(arg arduino_topic)"/>
+    <node pkg="rosserial_python" type="serial_node.py" name="rosserial_node" output="$(arg output)">
+	    <param name="~port" value="$(arg communication_port)"  />
+    </node>
+
+</launch>

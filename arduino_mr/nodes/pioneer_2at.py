@@ -57,7 +57,7 @@ class ATX2():
         self.msg_seqs = {}
         self.msg_seqs["odometry"] = 0
 
-        self.rate = rospy.Rate(200) # Hz
+        self.rate = 200 # Hz
 
         # Setup the robot odometry message
         self.odom = Odometry()
@@ -89,19 +89,19 @@ class ATX2():
         """
         rospy.loginfo('Safe shutdown initiated')
 
-        for i in range(0, 1000):
+        for i in range(0, 5000):
             self.arduino_pub.publish(mode=3, data1=0, data2=0)
             self.rate.sleep()
 
     def _update_mr_odometry(self, msg):
         """Update the estimated robot position and velocity."""
 
-        encoder_r = msg.encoder_r
-        encoder_l = msg.encoder_l
+        encoderR = msg.encoderR
+        encoderL = msg.encoderL
 
-        wheel_l = 2.0 * pi * (encoder_l / self.encres) / 0.015
-        wheel_r = 2.0 * pi * (encoder_r / self.encres) / 0.015
-        # dtheta = ((encoder_r - encoder_l) * 2.0 * pi * self.R) / (2.0 * self.encres * self.d)
+        wheel_l = 2.0 * pi * (encoderL / self.encres) / 0.015
+        wheel_r = 2.0 * pi * (encoderR / self.encres) / 0.015
+        # dtheta = ((encoderR - encoderL) * 2.0 * pi * self.R) / (2.0 * self.encres * self.d)
         omega = -((wheel_r - wheel_l) * self.R) / (self.d * 2.0)
         # Rotation around Z axis only
         # TODO
