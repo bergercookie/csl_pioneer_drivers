@@ -6,6 +6,11 @@ Mon Sep 26 12:00:44 EEST 2016, Nikos Koukis
 Send velocity commands and read odometry feedback from a Pioneer 2AT robot with
 custom drivers (not powered by ARIA)
 
+20170605 Update: 
+- Do not run this script directly. Instead launch this via the wrapper
+launchfile: setup_pioneer_generic.launch
+- rosserial_python/serial.py node is launched separately
+
 Initial script written by: Apostolos Poulias, 2015
 Maintainer: Nikos Koukis, 2016 -
 
@@ -52,7 +57,7 @@ class ATX2():
         self.msg_seqs = {}
         self.msg_seqs["odometry"] = 0
 
-        self.rate = 200
+        self.rate = rospy.Rate(200) # Hz
 
         # Setup the robot odometry message
         self.odom = Odometry()
@@ -60,7 +65,6 @@ class ATX2():
         self.odom.child_frame_id = self.frame_IDs["odometry"]
 
         self._setup_publishers_subscribers()
-        self._launch_rosserial_node()
 
     def _setup_publishers_subscribers(self):
 
@@ -78,81 +82,33 @@ class ATX2():
                          self._update_mr_odometry)
 
 
-
-    def _launch_rosserial_node(self):
-        """Wrapper method for launching a rosserial node."""
-        rospy.loginfo("Initializing a rosserial node...")
-
-        package = "rosserial_python"
-        executable = "serial_node.py"
-
-        num_tries = 1
-        tries_thresh = 10
-        rospy.loginfo(
-            "Fetching the serial port for communicating with the arduino")
-        # Wait until the arduino port parameter is available in the ROS
-        # parameter server
-        while not rospy.has_param(self.param_names["port"]) and \
-                num_tries <= tries_thresh and \
-                not rospy.is_shutdown():
-            rospy.logwarn(
-                "Arduino port is not set yet. Retrying... {}/{}".\
-                format(num_tries,
-                       tries_thresh))
-            time.sleep(2)
-            num_tries += 1
-
-        if num_tries > tries_thresh:
-            rospy.logwarn(
-                "Arduino port is not set. Defaulting to %s",
-                self.def_params[self.param_names["port"]])
-
-
-        serial_port = rospy.get_param(self.param_names["port"],
-                                      "/dev/ttyACM0")
-
-        # Launch the rosserial node
-        node = roslaunch.core.Node(package,
-                                   executable,
-                                   args=serial_port,
-                                   remap_args=[("/arduino_input_2at",
-                                                "{ns}/arduino_input_2at".\
-                                                format(ns=rospy.get_namespace()))])
-        launch = roslaunch.scriptapi.ROSLaunch()
-        launch.start()
-
-        self.rosserial_process = launch.launch(node)
-        rospy.loginfo("rosserial node is initialized successfully.")
-
-
     def shutdown(self):
         """
         Safely shutdown the pioneer instance by sending bunch of 0-velocity
         commands.
         """
-        print 'Safe shutdown initiated'
+        rospy.loginfo('Safe shutdown initiated')
 
         for i in range(0, 1000):
             self.arduino_pub.publish(mode=3, data1=0, data2=0)
             self.rate.sleep()
-        self.rosserial_process.stop()
 
     def _update_mr_odometry(self, msg):
         """Update the estimated robot position and velocity."""
 
-        encoderR = msg.encoderR
-        encoderL = msg.encoderL
+        encoder_r = msg.encoder_r
+        encoder_l = msg.encoder_l
 
-        wL = 2.0 * pi * (encoderL / self.encres) / 0.015
-        wR = 2.0 * pi * (encoderR / self.encres) / 0.015
-        # dtheta = ((encoderR - encoderL) * 2.0 * pi * self.R) / (2.0 * self.encres * self.d)
-        omega = -((wR - wL) * self.R) / (self.d * 2.0)
+        wheel_l = 2.0 * pi * (encoder_l / self.encres) / 0.015
+        wheel_r = 2.0 * pi * (encoder_r / self.encres) / 0.015
+        # dtheta = ((encoder_r - encoder_l) * 2.0 * pi * self.R) / (2.0 * self.encres * self.d)
+        omega = -((wheel_r - wheel_l) * self.R) / (self.d * 2.0)
         # Rotation around Z axis only
         # TODO
         # self.odom.pose.pose.orientation += omega / float(self.rate)
         # self.odom.pose.pose.orientation %= 2 * pi
 
-        u = (wR + wL) * self.R / 2.0
+        u = (wheel_r + wheel_l) * self.R / 2.0
         # TODO - change this
         # u_x = u * cos(self.odom.pose.pose.theta)
         # u_y = u * sin(self.odom.pose.pose.theta)
